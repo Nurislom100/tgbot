@@ -31,9 +31,9 @@ def on_startup():
 
 
 def get_user_or_403(init_data: str):
-    user = validate_init_data(init_data)
+    user, error = validate_init_data(init_data)
     if not user:
-        raise HTTPException(status_code=403, detail="Invalid initData")
+        raise HTTPException(status_code=403, detail=f"Invalid initData: {error}")
     return user
 
 
