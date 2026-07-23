@@ -4,14 +4,17 @@ import json
 import os
 from urllib.parse import parse_qsl
 
-BOT_TOKEN = os.environ["BOT_TOKEN"]
+BOT_TOKEN = os.environ["BOT_TOKEN"].strip()
 
 
 def validate_init_data(init_data: str):
-    """Telegram WebApp initData'ni tekshiradi va foydalanuvchi ma'lumotini qaytaradi.
-    Soxta so'rovlarning oldini olish uchun HAR BIR so'rovda ishlatiladi."""
+    """Telegram WebApp initData'ni tekshiradi va foydalanuvchi ma'lumotini qaytaradi."""
     try:
-        parsed = dict(parse_qsl(init_data, strict_parsing=True))
+        if not init_data:
+            return None
+
+        parsed = dict(parse_qsl(init_data, strict_parsing=False, keep_blank_values=True))
+        parsed.pop("signature", None)
         received_hash = parsed.pop("hash", None)
         if not received_hash:
             return None
