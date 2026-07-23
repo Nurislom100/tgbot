@@ -76,15 +76,14 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-// DIQQAT: Agar backend serveringiz boshqa domen/portda bo'lsa, pastdagi URL'ni almashtiring
-// Masalan: const API_BASE = "https://backend-serveringiz.uz";
-const API_BASE = window.location.origin;
+// Render'dagi backend servisingizning to'liq domenini shu yerga yozasiz:
+const API_BASE = "https://tgbot-backend.onrender.com";
 
 let selectedLat = null, selectedLng = null;
 let photoBase64 = null;
 let mapInited = false, ymap = null;
 
-// Rasmni siqish funksiyasi (Serverga katta rasm ketmasligi uchun)
+// Rasmni siqish funksiyasi (Serverga katta rasm ketib xato bermasligi uchun)
 function compressImage(file, maxWidth, quality, callback) {
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -105,7 +104,6 @@ function compressImage(file, maxWidth, quality, callback) {
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, width, height);
       
-      // JPEG formatda 0.7 sifati bilan siqish
       callback(canvas.toDataURL("image/jpeg", quality));
     };
     img.src = e.target.result;
@@ -117,7 +115,7 @@ document.getElementById("photoInput").addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
-  // Rasmni max-width 800px va 70% sifat bilan siqamiz
+  // Rasmni enini max 800px qilib, 70% sifat bilan siqamiz
   compressImage(file, 800, 0.7, (base64Result) => {
     photoBase64 = base64Result;
     const img = document.getElementById("photoPreview");
@@ -132,7 +130,7 @@ function openMap() {
   if (mapInited) return;
   mapInited = true;
 
-  // YANDEX_API_KEY joyiga o'zingizning API kalitingizni yozing!
+  // YANDEX_API_KEY o'rniga o'z kalitingiz bo'lsa qo'ying
   const script = document.createElement("script");
   script.src = "https://api-maps.yandex.ru/2.1/?apikey=YANDEX_API_KEY&lang=uz_UZ";
   script.onload = () => {
@@ -193,14 +191,14 @@ async function saveRecord() {
       } catch (e) {
         errDetail = await res.text();
       }
-      throw new Error(`Server xatosi [${res.status}]: ${errDetail}`);
+      throw new Error(`[Status ${res.status}]: ${errDetail}`);
     }
 
     document.getElementById("formView").style.display = "none";
     document.getElementById("savedMsg").style.display = "block";
   } catch (err) {
     tg.showAlert("Xato yuz berdi: " + err.message);
-    console.error(err);
+    console.error("Xatolik tafsiloti:", err);
   } finally {
     btn.disabled = false; 
     btn.textContent = "Saqlash";
