@@ -17,17 +17,13 @@ def language_keyboard() -> InlineKeyboardMarkup:
 
 
 def main_menu_keyboard(lang: str, webapp_add_url: str, webapp_stats_url: str) -> ReplyKeyboardMarkup:
-    # Telegram keshini tozalash uchun URL oxiriga app.html va kesh parametri (?v=99) ulaymiz
-    if webapp_add_url.endswith("/"):
-        clean_url = webapp_add_url[:-1]
+    # URL oxirini to'g'rilash va keshni buzish kodi
+    base_url = webapp_add_url.rstrip("/")
+    
+    if not base_url.endswith("app.html"):
+        final_add_url = f"{base_url}/app.html?v=99"
     else:
-        clean_url = webapp_add_url
-
-    # Agar domen oxirida app.html bo'lmasa, o'zimiz to'g'ri biriktiramiz
-    if not clean_url.endswith("app.html"):
-        final_add_url = f"{clean_url}/app.html?v=99"
-    else:
-        final_add_url = f"{clean_url}?v=99"
+        final_add_url = f"{base_url}?v=99"
 
     return ReplyKeyboardMarkup(
         keyboard=[
