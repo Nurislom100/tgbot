@@ -1,7 +1,9 @@
 import asyncio
+import json
 import logging
 import os
 import threading
+import base64
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from aiogram import Bot, Dispatcher, F
@@ -76,6 +78,78 @@ async def cmd_hisobot(message: Message):
         t(lang, "menu_stats"),
         reply_markup=main_menu_keyboard(lang, WEBAPP_ADD_URL, WEBAPP_STATS_URL),
     )
+
+
+# =========================================================
+# WEB APP'DAN KELGAN MA'LUMOTLARNI QABUL QILUVCHI HANDLER
+# =========================================================
+@dp.message(F.web_app_data)
+async def handle_web_app_data(message: Message):
+    try:
+        # WebApp jo'natgan JSON matnni o'qiymiz
+        raw_data = message.web_app_data.data
+        data = json.loads(raw_data)
+
+        user_id = message.from_user.id
+        distributor = db.get_distributor(user_id)
+        lang = distributor["language"] if distributor else "uz"
+
+        shop_name = data.get("shop_name")
+        address_text = data.get("address_text")
+        latitude = data.get("latitude")
+        longitude = data.get("longitude")
+        phone = data.get("phone")
+        product_name = data.get("product_name")
+        quantity = data.get("quantity")
+        photo_base64 = data.get("photo_base64")
+
+        # Database (baza) ga saqlash
+        # database.py faylingizdagi funksiya nomiga moslab tekshirib oling:
+        if hasattr(db, "add_record"):
+            db.add_record(
+                distributor_id=user_id,
+                shop_name=shop_name,
+                address_text=address_text,
+                latitude=latitude,
+                longitude=longitude,
+                phone=phone,
+                product_name=product_name,
+                quantity=quantity,
+                photo_base64=photo_base64
+            )
+        elif hasattr(db, "create_record"):
+            db.create_record(
+                distributor_id=user_id,
+                shop_name=shop_name,
+                address_text=address_text,
+                latitude=latitude,
+                longitude=longitude,
+                phone=phone,
+                product_name=product_name,
+                quantity=quantity,
+                photo_base64=photo_base64
+            )
+
+        # Foydalanuvchiga muvaffaqiyatli saqlangani haqida bildirishnoma yuborish
+        msg_text = f"✅ **Qayd saqlandi!**\n\n" \
+                   f"🏪 **Do'kon:** {shop_name}\n"
+        
+        if address_text:
+            msg_text += f"📍 **Manzil:** {address_text}\n"
+        if product_name:
+            msg_text += f"📦 **Mahsulot:** {product_name}\n"
+        if quantity:
+            msg_text += f"🔢 **Miqdori:** {quantity}\n"
+
+        await message.answer(msg_text, parse_mode="Markdown")
+
+        # Agar joylashuv (koordinata) bo'lsa, xarita yuborish
+        if latitude and longitude:
+            await message.answer_location(latitude=float(latitude), longitude=float(longitude))
+
+    except Exception as e:
+        logging.error(f"WebApp ma'lumotlarini saqlashda xatolik: {e}")
+        await message.answer("❌ Qaydni saqlashda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
 
 
 class HealthHandler(BaseHTTPRequestHandler):
