@@ -76,14 +76,11 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-// Render'dagi backend servisingizning to'liq domenini shu yerga yozasiz:
-const API_BASE = "https://tgbot-backend.onrender.com";
-
 let selectedLat = null, selectedLng = null;
 let photoBase64 = null;
 let mapInited = false, ymap = null;
 
-// Rasmni siqish funksiyasi (Serverga katta rasm ketib xato bermasligi uchun)
+// Rasmni siqish funksiyasi
 function compressImage(file, maxWidth, quality, callback) {
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -115,8 +112,7 @@ document.getElementById("photoInput").addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
-  // Rasmni enini max 800px qilib, 70% sifat bilan siqamiz
-  compressImage(file, 800, 0.7, (base64Result) => {
+  compressImage(file, 600, 0.6, (base64Result) => {
     photoBase64 = base64Result;
     const img = document.getElementById("photoPreview");
     img.src = photoBase64;
@@ -130,12 +126,11 @@ function openMap() {
   if (mapInited) return;
   mapInited = true;
 
-  // YANDEX_API_KEY o'rniga o'z kalitingiz bo'lsa qo'ying
   const script = document.createElement("script");
   script.src = "https://api-maps.yandex.ru/2.1/?apikey=YANDEX_API_KEY&lang=uz_UZ";
   script.onload = () => {
     ymaps.ready(() => {
-      ymap = new ymaps.Map("map", { center: [40.7821, 72.3442], zoom: 12 }); // Andijon markazi
+      ymap = new ymaps.Map("map", { center: [40.7821, 72.3442], zoom: 12 });
       ymap.events.add("click", (e) => {
         const coords = e.get("coords");
         selectedLat = coords[0];
@@ -150,7 +145,7 @@ function openMap() {
   document.head.appendChild(script);
 }
 
-async function saveRecord() {
+function saveRecord() {
   const shopName = document.getElementById("shopName").value.trim();
   if (!shopName) {
     tg.showAlert("Do'kon nomini kiriting");
@@ -158,7 +153,6 @@ async function saveRecord() {
   }
 
   const payload = {
-    init_data: tg.initData,
     shop_name: shopName,
     address_text: document.getElementById("addressText").value.trim() || null,
     latitude: selectedLat,
@@ -169,39 +163,13 @@ async function saveRecord() {
     photo_base64: photoBase64,
   };
 
-  const btn = document.getElementById("saveBtn");
-  btn.disabled = true; 
-  btn.textContent = "Saqlanmoqda...";
-
   try {
-    const res = await fetch(`${API_BASE}/api/record`, {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      let errDetail = "";
-      try {
-        const errJson = await res.json();
-        errDetail = JSON.stringify(errJson);
-      } catch (e) {
-        errDetail = await res.text();
-      }
-      throw new Error(`[Status ${res.status}]: ${errDetail}`);
-    }
-
-    document.getElementById("formView").style.display = "none";
-    document.getElementById("savedMsg").style.display = "block";
+    // Ma'lumotlarni to'g'ridan-to'g'ri Telegram Botga uzatamiz
+    tg.sendData(JSON.stringify(payload));
+    tg.close(); // Telegram Mini App oynasi avtomatik yopiladi
   } catch (err) {
     tg.showAlert("Xato yuz berdi: " + err.message);
-    console.error("Xatolik tafsiloti:", err);
-  } finally {
-    btn.disabled = false; 
-    btn.textContent = "Saqlash";
+    console.error(err);
   }
 }
 
