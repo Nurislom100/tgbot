@@ -1,4 +1,5 @@
 import base64
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -13,10 +14,15 @@ import database as db  # noqa: E402
 from auth import validate_init_data  # noqa: E402
 
 BASE_DIR = Path(__file__).parent.parent
+WEBAPP_DIR = BASE_DIR / "webapp"
 UPLOADS_DIR = BASE_DIR / "uploads"
+
+# Papkalar mavjud bo'lmasa yaratamiz
 UPLOADS_DIR.mkdir(exist_ok=True)
+WEBAPP_DIR.mkdir(exist_ok=True)
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -119,5 +125,9 @@ def get_stats(init_data: str, year: int, month: int):
     }
 
 
+# Static fayllar va HTML xaritasini ulash
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
-app.mount("/", StaticFiles(directory=BASE_DIR / "webapp", html=True), name="webapp")
+
+# HTML fayllar /webapp/add.html yo'li orqali ham, /add.html yo'li orqali ham ochilishi uchun:
+app.mount("/webapp", StaticFiles(directory=WEBAPP_DIR, html=True), name="webapp_path")
+app.mount("/", StaticFiles(directory=WEBAPP_DIR, html=True), name="webapp_root")
