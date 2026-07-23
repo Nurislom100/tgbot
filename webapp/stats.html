@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statistika</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, sans-serif;
+    background: var(--tg-theme-bg-color, #fff);
+    color: var(--tg-theme-text-color, #000);
+    margin: 0; padding: 16px;
+  }
+  .filters { display: flex; gap: 8px; margin-bottom: 16px; }
+  select {
+    flex: 1; padding: 10px; border-radius: 10px;
+    border: 1px solid rgba(127,127,127,0.3);
+    background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+    color: inherit; font-size: 14px;
+  }
+  .cards { display: flex; gap: 10px; margin-bottom: 20px; }
+  .card {
+    flex: 1; background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+    border-radius: 12px; padding: 12px; text-align: center;
+  }
+  .card .num { font-size: 20px; font-weight: 500; }
+  .card .label { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+  .record {
+    border-bottom: 1px solid rgba(127,127,127,0.15);
+    padding: 12px 0;
+  }
+  .record .shop { font-size: 15px; font-weight: 500; }
+  .record .meta { font-size: 13px; opacity: 0.7; margin-top: 2px; }
+  .record img { max-width: 100%; border-radius: 8px; margin-top: 6px; }
+  .empty { text-align: center; opacity: 0.6; padding: 40px 0; font-size: 14px; }
+  h3 { font-size: 15px; font-weight: 500; margin: 20px 0 8px; }
+</style>
+</head>
+<body>
+
+<div class="filters">
+  <select id="monthSelect"></select>
+  <select id="yearSelect"></select>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="num" id="totalRecords">-</div><div class="label">qayd</div></div>
+  <div class="card"><div class="num" id="uniqueShops">-</div><div class="label">do'kon</div></div>
+  <div class="card"><div class="num" id="totalQty">-</div><div class="label">mahsulot</div></div>
+</div>
+
+<h3>Mening qaydlarim</h3>
+<div id="recordsList"></div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const API_BASE = window.location.origin;
+const monthNames = ["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"];
+
+const monthSelect = document.getElementById("monthSelect");
+const yearSelect = document.getElementById("yearSelect");
+const now = new Date();
+
+monthNames.forEach((name, i) => {
+  const opt = document.createElement("option");
+  opt.value = i + 1; opt.textContent = name;
+  if (i + 1 === now.getMonth() + 1) opt.selected = true;
+  monthSelect.appendChild(opt);
+});
+
+for (let y = now.getFullYear(); y >= now.getFullYear() - 2; y--) {
+  const opt = document.createElement("option");
+  opt.value = y; opt.textContent = y;
+  yearSelect.appendChild(opt);
+}
+
+monthSelect.addEventListener("change", loadStats);
+yearSelect.addEventListener("change", loadStats);
+
+async function loadStats() {
+  const month = monthSelect.value;
+  const year = yearSelect.value;
+
+  const params = new URLSearchParams({
+    init_data: tg.initData,
+    year, month,
+  });
+
+  try {
+    const res = await fetch(`${API_BASE}/api/stats?${params}`);
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    document.getElementById("totalRecords").textContent = data.total_records;
+    document.getElementById("uniqueShops").textContent = data.unique_shops;
+    document.getElementById("totalQty").textContent = data.total_quantity;
+
+    const list = document.getElementById("recordsList");
+    list.innerHTML = "";
+
+    if (data.records.length === 0) {
+      list.innerHTML = '<div class="empty">Bu oyda qayd topilmadi</div>';
+      return;
+    }
+
+    data.records.forEach((r) => {
+      const div = document.createElement("div");
+      div.className = "record";
+      let metaParts = [r.created_at];
+      if (r.product_name) metaParts.push(`${r.product_name}${r.quantity ? " · " + r.quantity : ""}`);
+      if (r.address_text) metaParts.push(r.address_text);
+      if (r.phone) metaParts.push(r.phone);
+
+      div.innerHTML = `
+        <div class="shop">${escapeHtml(r.shop_name)}</div>
+        <div class="meta">${metaParts.map(escapeHtml).join(" · ")}</div>
+        ${r.photo_path ? `<img src="${API_BASE}/uploads/${r.photo_path}">` : ""}
+      `;
+      list.appendChild(div);
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+loadStats();
+</script>
+</body>
+</html>

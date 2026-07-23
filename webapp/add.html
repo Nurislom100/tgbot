@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qayd qo'shish</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, sans-serif;
+    background: var(--tg-theme-bg-color, #fff);
+    color: var(--tg-theme-text-color, #000);
+    margin: 0; padding: 16px;
+  }
+  h2 { font-size: 18px; font-weight: 500; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; opacity: 0.7; margin: 14px 0 4px; }
+  input, textarea {
+    width: 100%; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid rgba(127,127,127,0.3);
+    background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+    color: inherit; font-size: 15px;
+  }
+  .req { color: #e05353; }
+  button.secondary {
+    margin-top: 8px; width: 100%; padding: 10px; border-radius: 10px;
+    border: 1px solid rgba(127,127,127,0.3); background: transparent;
+    color: inherit; font-size: 14px;
+  }
+  #map { width: 100%; height: 260px; border-radius: 10px; margin-top: 8px; display: none; }
+  #locStatus { font-size: 13px; margin-top: 6px; opacity: 0.8; }
+  #photoPreview { max-width: 100%; border-radius: 10px; margin-top: 8px; display: none; }
+  #saveBtn {
+    margin-top: 20px; width: 100%; padding: 14px; border-radius: 10px;
+    border: none; background: var(--tg-theme-button-color, #2481cc);
+    color: var(--tg-theme-button-text-color, #fff); font-size: 16px; font-weight: 500;
+  }
+  #savedMsg { display:none; text-align:center; padding: 40px 0; font-size: 16px; }
+</style>
+</head>
+<body>
+
+<div id="formView">
+  <h2>Yangi qayd</h2>
+
+  <label>Do'kon nomi <span class="req">*</span></label>
+  <input id="shopName" type="text" placeholder="masalan: Guliston market">
+
+  <label>Do'kon manzili (matn)</label>
+  <input id="addressText" type="text" placeholder="ko'cha, mo'ljal">
+
+  <button type="button" class="secondary" onclick="openMap()">📍 Xaritadan joy tanlash</button>
+  <div id="map"></div>
+  <div id="locStatus"></div>
+
+  <label>Telefon raqami</label>
+  <input id="phone" type="tel" placeholder="+998 90 123 45 67">
+
+  <label>Mahsulot nomi</label>
+  <input id="productName" type="text" placeholder="masalan: gazli suv">
+
+  <label>Miqdori</label>
+  <input id="quantity" type="text" placeholder="masalan: 20 dona">
+
+  <label>Rasm (ixtiyoriy)</label>
+  <input id="photoInput" type="file" accept="image/*" capture="environment">
+  <img id="photoPreview">
+
+  <button id="saveBtn" onclick="saveRecord()">Saqlash</button>
+</div>
+
+<div id="savedMsg">✅ Qayd saqlandi.<br><br><button class="secondary" onclick="resetForm()">Yana qo'shish</button></div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const API_BASE = window.location.origin;
+let selectedLat = null, selectedLng = null;
+let photoBase64 = null;
+let mapInited = false, ymap = null;
+
+document.getElementById("photoInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    photoBase64 = reader.result;
+    const img = document.getElementById("photoPreview");
+    img.src = photoBase64;
+    img.style.display = "block";
+  };
+  reader.readAsDataURL(file);
+});
+
+function openMap() {
+  const mapDiv = document.getElementById("map");
+  mapDiv.style.display = "block";
+  if (mapInited) return;
+  mapInited = true;
+
+  // YANDEX_API_KEY ni o'zingizning kalitingizga almashtiring (developer.tech.yandex.ru)
+  const script = document.createElement("script");
+  script.src = "https://api-maps.yandex.ru/2.1/?apikey=YANDEX_API_KEY&lang=uz_UZ";
+  script.onload = () => {
+    ymaps.ready(() => {
+      ymap = new ymaps.Map("map", { center: [40.7821, 72.3442], zoom: 12 }); // Andijon markazi
+      ymap.events.add("click", (e) => {
+        const coords = e.get("coords");
+        selectedLat = coords[0];
+        selectedLng = coords[1];
+        ymap.geoObjects.removeAll();
+        ymap.geoObjects.add(new ymaps.Placemark(coords));
+        document.getElementById("locStatus").textContent =
+          `✅ Joylashuv tanlandi: ${selectedLat.toFixed(5)}, ${selectedLng.toFixed(5)}`;
+      });
+    });
+  };
+  document.head.appendChild(script);
+}
+
+async function saveRecord() {
+  const shopName = document.getElementById("shopName").value.trim();
+  if (!shopName) {
+    tg.showAlert("Do'kon nomini kiriting");
+    return;
+  }
+
+  const payload = {
+    init_data: tg.initData,
+    shop_name: shopName,
+    address_text: document.getElementById("addressText").value.trim() || null,
+    latitude: selectedLat,
+    longitude: selectedLng,
+    phone: document.getElementById("phone").value.trim() || null,
+    product_name: document.getElementById("productName").value.trim() || null,
+    quantity: document.getElementById("quantity").value.trim() || null,
+    photo_base64: photoBase64,
+  };
+
+  const btn = document.getElementById("saveBtn");
+  btn.disabled = true; btn.textContent = "Saqlanmoqda...";
+
+  try {
+    const res = await fetch(`${API_BASE}/api/record`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+
+    document.getElementById("formView").style.display = "none";
+    document.getElementById("savedMsg").style.display = "block";
+  } catch (err) {
+    tg.showAlert("Xatolik yuz berdi, qayta urinib ko'ring");
+    console.error(err);
+  } finally {
+    btn.disabled = false; btn.textContent = "Saqlash";
+  }
+}
+
+function resetForm() {
+  document.getElementById("shopName").value = "";
+  document.getElementById("addressText").value = "";
+  document.getElementById("phone").value = "";
+  document.getElementById("productName").value = "";
+  document.getElementById("quantity").value = "";
+  document.getElementById("photoPreview").style.display = "none";
+  document.getElementById("locStatus").textContent = "";
+  selectedLat = null; selectedLng = null; photoBase64 = null;
+  document.getElementById("savedMsg").style.display = "none";
+  document.getElementById("formView").style.display = "block";
+}
+</script>
+</body>
+</html>
